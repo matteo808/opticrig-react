@@ -55,27 +55,70 @@ function computeSvgModel(spec: OpticAvatarSpec, pose: OpticPoseState) {
   const tiltDeg = (pose.headRoll * 180) / Math.PI;
   const hoverOffsetPx = -pose.hoverY * 110;
 
+  const stretch = clamp(spec.bodyStretchY ?? 1, 0.8, 1.25);
+
   const isOrbital = spec.chassis === 'orbital-core';
   const isPod = spec.chassis === 'braun-pod';
   const isPrism = spec.chassis === 'cyber-prism';
+  const isCrt = spec.chassis === 'crt-monitor';
+  const isPill = spec.chassis === 'capsule-pill';
+  const isCube = spec.chassis === 'tactile-cube';
+  const isDrone = spec.chassis === 'drone-shell';
 
-  const bodyW = isOrbital ? 174 : isPod ? 182 : isPrism ? 168 : 158;
-  const bodyH = isOrbital ? 174 : isPod ? 156 : isPrism ? 176 : 190;
+  const bodyW = isOrbital
+    ? 174
+    : isPill
+      ? 206
+      : isDrone
+        ? 196
+        : isCrt
+          ? 188
+          : isPod
+            ? 182
+            : isCube
+              ? 168
+              : isPrism
+                ? 168
+                : 158;
+  const baseH = isOrbital
+    ? 174
+    : isPill
+      ? 138
+      : isDrone
+        ? 136
+        : isCrt
+          ? 162
+          : isPod
+            ? 156
+            : isCube
+              ? 168
+              : isPrism
+                ? 176
+                : 190;
+  const bodyH = Math.round(baseH * stretch);
   const bodyX = 160 - bodyW / 2;
   const bodyY = 156 - bodyH / 2;
   const bodyRadius = isOrbital
     ? 87
-    : isPod
-      ? 34 + spec.roundness * 34
-      : isPrism
-        ? 14 + spec.roundness * 14
-        : 10 + spec.roundness * 26;
+    : isPill
+      ? bodyH / 2
+      : isDrone
+        ? bodyH / 2
+        : isPod
+          ? 34 + spec.roundness * 34
+          : isCrt
+            ? 18 + spec.roundness * 18
+            : isCube
+              ? 20 + spec.roundness * 22
+              : isPrism
+                ? 14 + spec.roundness * 14
+                : 10 + spec.roundness * 26;
 
-  const visorW = (isOrbital ? 124 : 132) * clamp(spec.visorScale, 0.75, 1.25);
-  const visorH = (isOrbital ? 78 : 82) * clamp(spec.visorScale, 0.75, 1.25);
+  const visorW = (isOrbital ? 124 : isPill ? 146 : 132) * clamp(spec.visorScale, 0.75, 1.25);
+  const visorH = (isOrbital ? 78 : isDrone ? 74 : 82) * clamp(spec.visorScale, 0.75, 1.25);
   const visorX = 160 - visorW / 2;
   const visorY = 148 - visorH / 2;
-  const visorRadius = isOrbital ? visorH / 2 : 12 + spec.roundness * 18;
+  const visorRadius = isOrbital || isPill ? visorH / 2 : 12 + spec.roundness * 18;
 
   const isLightBody =
     spec.materialFinish === 'matte-ceramic' && spec.bodyColor.toUpperCase() > '#888888';
@@ -158,6 +201,8 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
 
   const haloRotDeg = Math.sin(pose.accessorySpin) * 8 - 14;
   const pointerBobY = Math.sin(pose.accessorySpin * 2.2) * 7;
+  const sideAddon = spec.sideAddon ?? 'none';
+  const mouthStyle = spec.mouthStyle ?? 'equalizer-bars';
 
   const chassisSvgStr =
     spec.chassis === 'cyber-prism'
@@ -176,7 +221,38 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
              <line x1="${cx + 38}" y1="${m.bodyY + 6}" x2="${cx + 46}" y2="${m.bodyY - 34}" stroke="${spec.secondaryColor}" stroke-width="4" stroke-linecap="round" />
              <circle cx="${cx + 46}" cy="${m.bodyY - 38}" r="7" fill="${spec.accentColor}" />
            </g>`
-        : '';
+        : spec.accessory === 'twin-antennas'
+          ? `<g transform="translate(${m.pxBody} ${m.pyBody})">
+               <line x1="${cx - 42}" y1="${m.bodyY + 8}" x2="${cx - 56}" y2="${m.bodyY - 32}" stroke="${spec.secondaryColor}" stroke-width="4" stroke-linecap="round" />
+               <circle cx="${cx - 56}" cy="${m.bodyY - 36}" r="6.5" fill="${spec.accentColor}" />
+               <line x1="${cx + 42}" y1="${m.bodyY + 8}" x2="${cx + 56}" y2="${m.bodyY - 32}" stroke="${spec.secondaryColor}" stroke-width="4" stroke-linecap="round" />
+               <circle cx="${cx + 56}" cy="${m.bodyY - 36}" r="6.5" fill="${spec.accentColor}" />
+             </g>`
+          : spec.accessory === 'cat-ears'
+            ? `<g transform="translate(${m.pxBody} ${m.pyBody})">
+                 <polygon points="${cx - 64},${m.bodyY + 12} ${cx - 54},${m.bodyY - 34} ${cx - 20},${m.bodyY + 6}" fill="${m.bodyShadow}" stroke="${spec.accentColor}" stroke-width="2" />
+                 <polygon points="${cx + 64},${m.bodyY + 12} ${cx + 54},${m.bodyY - 34} ${cx + 20},${m.bodyY + 6}" fill="${m.bodyShadow}" stroke="${spec.accentColor}" stroke-width="2" />
+               </g>`
+            : '';
+
+  const sideAddonStr =
+    sideAddon === 'studio-headphones'
+      ? `<g transform="translate(${m.pxBody} ${m.pyBody})">
+           <path d="M ${m.bodyX - 4} 148 C ${m.bodyX - 8} ${m.bodyY - 38}, ${m.bodyX + m.bodyW + 8} ${m.bodyY - 38}, ${m.bodyX + m.bodyW + 4} 148" fill="none" stroke="${m.bodyHighlight}" stroke-width="8" stroke-linecap="round" />
+           <rect x="${m.bodyX - 18}" y="128" width="22" height="52" rx="10" fill="${m.bodyShadow}" stroke="${spec.accentColor}" stroke-width="2" />
+           <rect x="${m.bodyX + m.bodyW - 4}" y="128" width="22" height="52" rx="10" fill="${m.bodyShadow}" stroke="${spec.accentColor}" stroke-width="2" />
+         </g>`
+      : sideAddon === 'side-fins'
+        ? `<g transform="translate(${m.pxBody} ${m.pyBody})">
+             <rect x="${m.bodyX - 14}" y="124" width="12" height="54" rx="5" fill="${spec.accentColor}" />
+             <rect x="${m.bodyX + m.bodyW + 2}" y="124" width="12" height="54" rx="5" fill="${spec.accentColor}" />
+           </g>`
+        : sideAddon === 'rotary-knobs'
+          ? `<g transform="translate(${m.pxBody} ${m.pyBody})">
+               <rect x="${m.bodyX - 11}" y="144" width="11" height="24" rx="4" fill="${spec.secondaryColor}" />
+               <rect x="${m.bodyX + m.bodyW}" y="144" width="11" height="24" rx="4" fill="${spec.secondaryColor}" />
+             </g>`
+          : '';
 
   const accessoryFrontStr =
     spec.accessory === 'visor-hood'
@@ -188,12 +264,24 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
         : '';
 
   let eyesSvgStr = '';
-  if (spec.eyeStyle === 'aperture-iris') {
+  if (spec.eyeStyle === 'aperture-iris' || spec.eyeStyle === 'cyclops-orb') {
     const r = Math.max(12, Math.min(26, (22 * Math.min(m.leftH, m.rightH)) / 28 + 5));
     eyesSvgStr = `
-      <circle cx="${cx}" cy="${eyeCenterY}" r="${r + 7}" fill="none" stroke="${spec.secondaryColor}" stroke-opacity="0.45" stroke-width="2" stroke-dasharray="6 4" />
+      <circle cx="${cx}" cy="${eyeCenterY}" r="${r + 7}" fill="none" stroke="${spec.secondaryColor}" stroke-opacity="0.45" stroke-width="2" />
       <circle cx="${cx}" cy="${eyeCenterY}" r="${r}" fill="none" stroke="${spec.accentColor}" stroke-width="4" />
       <circle cx="${cx}" cy="${eyeCenterY}" r="${(r * 0.48).toFixed(1)}" fill="${spec.accentColor}" />
+    `;
+  } else if (spec.eyeStyle === 'crosshair-hud') {
+    eyesSvgStr = `
+      <circle cx="${cx}" cy="${eyeCenterY}" r="22" fill="none" stroke="${spec.accentColor}" stroke-width="2.5" />
+      <line x1="${cx - 34}" y1="${eyeCenterY}" x2="${cx + 34}" y2="${eyeCenterY}" stroke="${spec.secondaryColor}" stroke-width="2.5" />
+      <line x1="${cx}" y1="${eyeCenterY - 28}" x2="${cx}" y2="${eyeCenterY + 28}" stroke="${spec.secondaryColor}" stroke-width="2.5" />
+      <circle cx="${cx}" cy="${eyeCenterY}" r="6" fill="${spec.accentColor}" />
+    `;
+  } else if (spec.eyeStyle === 'happy-arcs') {
+    eyesSvgStr = `
+      <path d="M ${cx - m.eyeGap - 14} ${eyeCenterY + 6} Q ${cx - m.eyeGap} ${eyeCenterY - 18} ${cx - m.eyeGap + 14} ${eyeCenterY + 6}" fill="none" stroke="${spec.accentColor}" stroke-width="5.5" stroke-linecap="round" />
+      <path d="M ${cx + m.eyeGap - 14} ${eyeCenterY + 6} Q ${cx + m.eyeGap} ${eyeCenterY - 18} ${cx + m.eyeGap + 14} ${eyeCenterY + 6}" fill="none" stroke="${spec.accentColor}" stroke-width="5.5" stroke-linecap="round" />
     `;
   } else if (spec.eyeStyle === 'waveform-visor') {
     const bars = [-38, -24, -10, 4, 18, 32].map((dx, i) => {
@@ -209,20 +297,22 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
     `;
   } else {
     eyesSvgStr = `
-      <rect x="${cx - m.eyeGap - 9}" y="${(eyeCenterY - m.leftH / 2).toFixed(1)}" width="18" height="${m.leftH.toFixed(1)}" rx="7" fill="${spec.accentColor}" />
-      <rect x="${cx + m.eyeGap - 9}" y="${(eyeCenterY - m.rightH / 2).toFixed(1)}" width="18" height="${m.rightH.toFixed(1)}" rx="7" fill="${spec.accentColor}" />
+      <rect x="${cx - m.eyeGap - 9}" y="${(eyeCenterY - m.leftH / 2).toFixed(1)}" width="18" height="${m.leftH.toFixed(1)}" rx="${spec.eyeStyle === 'pixel-matrix' ? 3 : 7}" fill="${spec.accentColor}" />
+      <rect x="${cx + m.eyeGap - 9}" y="${(eyeCenterY - m.rightH / 2).toFixed(1)}" width="18" height="${m.rightH.toFixed(1)}" rx="${spec.eyeStyle === 'pixel-matrix' ? 3 : 7}" fill="${spec.accentColor}" />
     `;
   }
 
   const mouthStr =
-    pose.mouthOpen > 0.02
-      ? m.waveHeights
-          .map((h, i) => {
-            const x = cx - 26 + i * 12;
-            return `<rect x="${x}" y="${(mouthY - h / 2).toFixed(1)}" width="6" height="${h}" rx="3" fill="${spec.secondaryColor}" />`;
-          })
-          .join('')
-      : `<rect x="${cx - 20}" y="${mouthY - 1.5}" width="40" height="3" rx="1.5" fill="${spec.secondaryColor}" fill-opacity="0.45" />`;
+    mouthStyle === 'none'
+      ? ''
+      : pose.mouthOpen > 0.02
+        ? m.waveHeights
+            .map((h, i) => {
+              const x = cx - 26 + i * 12;
+              return `<rect x="${x}" y="${(mouthY - h / 2).toFixed(1)}" width="6" height="${h}" rx="3" fill="${spec.secondaryColor}" />`;
+            })
+            .join('')
+        : `<rect x="${cx - 20}" y="${mouthY - 1.5}" width="40" height="3" rx="1.5" fill="${spec.secondaryColor}" fill-opacity="0.45" />`;
 
   const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
   <defs>
@@ -244,6 +334,7 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
   <ellipse cx="160" cy="278" rx="${(76 * m.shadowScale).toFixed(1)}" ry="${(12 * m.shadowScale).toFixed(1)}" fill="#000000" fill-opacity="0.38" />
   <g transform="translate(160 ${(160 + m.hoverOffsetPx).toFixed(2)}) scale(${m.entryScale.toFixed(3)}) rotate(${m.tiltDeg.toFixed(2)}) translate(-160 -160)">
     ${accessoryBackStr}
+    ${sideAddonStr}
     <g transform="translate(${m.pxBody.toFixed(2)} ${m.pyBody.toFixed(2)})">
       ${chassisSvgStr}
       <line x1="${m.bodyX + 24}" y1="${m.bodyY + 12}" x2="${m.bodyX + m.bodyW - 24}" y2="${m.bodyY + 12}" stroke="#ffffff" stroke-opacity="${m.glossOpacity}" stroke-width="3" stroke-linecap="round" />
@@ -325,6 +416,115 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
           </g>
         ) : null}
 
+        {spec.accessory === 'twin-antennas' ? (
+          <g transform={`translate(${m.pxBody.toFixed(2)} ${m.pyBody.toFixed(2)})`}>
+            <line
+              x1={cx - 42}
+              y1={m.bodyY + 8}
+              x2={cx - 56}
+              y2={m.bodyY - 32}
+              stroke={spec.secondaryColor}
+              strokeWidth={4}
+              strokeLinecap="round"
+            />
+            <circle cx={cx - 56} cy={m.bodyY - 36} r={6.5} fill={spec.accentColor} />
+            <line
+              x1={cx + 42}
+              y1={m.bodyY + 8}
+              x2={cx + 56}
+              y2={m.bodyY - 32}
+              stroke={spec.secondaryColor}
+              strokeWidth={4}
+              strokeLinecap="round"
+            />
+            <circle cx={cx + 56} cy={m.bodyY - 36} r={6.5} fill={spec.accentColor} />
+          </g>
+        ) : null}
+
+        {spec.accessory === 'cat-ears' ? (
+          <g transform={`translate(${m.pxBody.toFixed(2)} ${m.pyBody.toFixed(2)})`}>
+            <polygon
+              points={`${cx - 64},${m.bodyY + 12} ${cx - 54},${m.bodyY - 34} ${cx - 20},${m.bodyY + 6}`}
+              fill={m.bodyShadow}
+              stroke={spec.accentColor}
+              strokeWidth={2}
+            />
+            <polygon
+              points={`${cx + 64},${m.bodyY + 12} ${cx + 54},${m.bodyY - 34} ${cx + 20},${m.bodyY + 6}`}
+              fill={m.bodyShadow}
+              stroke={spec.accentColor}
+              strokeWidth={2}
+            />
+          </g>
+        ) : null}
+
+        {sideAddon === 'studio-headphones' ? (
+          <g transform={`translate(${m.pxBody.toFixed(2)} ${m.pyBody.toFixed(2)})`}>
+            <path
+              d={`M ${m.bodyX - 4} 148 C ${m.bodyX - 8} ${m.bodyY - 38}, ${m.bodyX + m.bodyW + 8} ${m.bodyY - 38}, ${m.bodyX + m.bodyW + 4} 148`}
+              fill="none"
+              stroke={m.bodyHighlight}
+              strokeWidth={8}
+              strokeLinecap="round"
+            />
+            <rect
+              x={m.bodyX - 18}
+              y={128}
+              width={22}
+              height={52}
+              rx={10}
+              fill={m.bodyShadow}
+              stroke={spec.accentColor}
+              strokeWidth={2}
+            />
+            <rect
+              x={m.bodyX + m.bodyW - 4}
+              y={128}
+              width={22}
+              height={52}
+              rx={10}
+              fill={m.bodyShadow}
+              stroke={spec.accentColor}
+              strokeWidth={2}
+            />
+          </g>
+        ) : null}
+
+        {sideAddon === 'side-fins' ? (
+          <g transform={`translate(${m.pxBody.toFixed(2)} ${m.pyBody.toFixed(2)})`}>
+            <rect x={m.bodyX - 14} y={124} width={12} height={54} rx={5} fill={spec.accentColor} />
+            <rect
+              x={m.bodyX + m.bodyW + 2}
+              y={124}
+              width={12}
+              height={54}
+              rx={5}
+              fill={spec.accentColor}
+            />
+          </g>
+        ) : null}
+
+        {sideAddon === 'rotary-knobs' ? (
+          <g transform={`translate(${m.pxBody.toFixed(2)} ${m.pyBody.toFixed(2)})`}>
+            <rect
+              x={m.bodyX - 11}
+              y={144}
+              width={11}
+              height={24}
+              rx={4}
+              fill={spec.secondaryColor}
+            />
+            <rect
+              x={m.bodyX + m.bodyW}
+              y={144}
+              width={11}
+              height={24}
+              rx={4}
+              fill={spec.secondaryColor}
+            />
+          </g>
+        ) : null}
+
         <g transform={`translate(${m.pxBody.toFixed(2)} ${m.pyBody.toFixed(2)})`}>
           {spec.chassis === 'cyber-prism' ? (
             <>
@@ -354,6 +554,27 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
               strokeWidth={2.5}
             />
           )}
+
+          {spec.chassis === 'crt-monitor' ? (
+            <>
+              <rect
+                x={cx - 18}
+                y={m.bodyY + m.bodyH - 2}
+                width={36}
+                height={18}
+                rx={4}
+                fill={m.bodyShadow}
+              />
+              <rect
+                x={cx - 48}
+                y={m.bodyY + m.bodyH + 14}
+                width={96}
+                height={10}
+                rx={5}
+                fill={m.bodyHighlight}
+              />
+            </>
+          ) : null}
 
           {spec.chassis === 'braun-pod' ? (
             <g fill={m.bodyShadow} fillOpacity={0.7}>
@@ -413,7 +634,7 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
         </g>
 
         <g transform={`translate(${m.pxEye.toFixed(2)} ${m.pyEye.toFixed(2)})`}>
-          {spec.eyeStyle === 'aperture-iris' ? (
+          {spec.eyeStyle === 'aperture-iris' || spec.eyeStyle === 'cyclops-orb' ? (
             (() => {
               const r = Math.max(
                 12,
@@ -443,6 +664,51 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
                 </>
               );
             })()
+          ) : spec.eyeStyle === 'crosshair-hud' ? (
+            <>
+              <circle
+                cx={cx}
+                cy={eyeCenterY}
+                r={22}
+                fill="none"
+                stroke={spec.accentColor}
+                strokeWidth={2.5}
+              />
+              <line
+                x1={cx - 34}
+                y1={eyeCenterY}
+                x2={cx + 34}
+                y2={eyeCenterY}
+                stroke={spec.secondaryColor}
+                strokeWidth={2.5}
+              />
+              <line
+                x1={cx}
+                y1={eyeCenterY - 28}
+                x2={cx}
+                y2={eyeCenterY + 28}
+                stroke={spec.secondaryColor}
+                strokeWidth={2.5}
+              />
+              <circle cx={cx} cy={eyeCenterY} r={6} fill={spec.accentColor} />
+            </>
+          ) : spec.eyeStyle === 'happy-arcs' ? (
+            <>
+              <path
+                d={`M ${cx - m.eyeGap - 14} ${eyeCenterY + 6} Q ${cx - m.eyeGap} ${eyeCenterY - 18} ${cx - m.eyeGap + 14} ${eyeCenterY + 6}`}
+                fill="none"
+                stroke={spec.accentColor}
+                strokeWidth={5.5}
+                strokeLinecap="round"
+              />
+              <path
+                d={`M ${cx + m.eyeGap - 14} ${eyeCenterY + 6} Q ${cx + m.eyeGap} ${eyeCenterY - 18} ${cx + m.eyeGap + 14} ${eyeCenterY + 6}`}
+                fill="none"
+                stroke={spec.accentColor}
+                strokeWidth={5.5}
+                strokeLinecap="round"
+              />
+            </>
           ) : spec.eyeStyle === 'waveform-visor' ? (
             [-38, -24, -10, 4, 18, 32].map((dx, i) => {
               const h = clamp(
@@ -498,7 +764,7 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
                 y={eyeCenterY - m.leftH / 2}
                 width={18}
                 height={m.leftH}
-                rx={7}
+                rx={spec.eyeStyle === 'pixel-matrix' ? 3 : 7}
                 fill={spec.accentColor}
               />
               <rect
@@ -506,20 +772,30 @@ function buildCoreSvgInner(spec: OpticAvatarSpec, pose: OpticPoseState, uid: str
                 y={eyeCenterY - m.rightH / 2}
                 width={18}
                 height={m.rightH}
-                rx={7}
+                rx={spec.eyeStyle === 'pixel-matrix' ? 3 : 7}
                 fill={spec.accentColor}
               />
             </>
           )}
 
-          {pose.mouthOpen > 0.02 ? (
+          {mouthStyle === 'none' ? null : mouthStyle === 'pulse-core' ? (
+            <rect
+              x={cx - 18 - pose.mouthOpen * 8}
+              y={mouthY - 2 - pose.mouthOpen * 5}
+              width={36 + pose.mouthOpen * 16}
+              height={4 + pose.mouthOpen * 10}
+              rx={6}
+              fill={spec.secondaryColor}
+              fillOpacity={pose.mouthOpen > 0.02 ? 1 : 0.45}
+            />
+          ) : pose.mouthOpen > 0.02 ? (
             m.waveHeights.map((h, i) => (
               <rect
                 key={i}
                 x={cx - 26 + i * 12}
                 y={mouthY - h / 2}
                 width={6}
-                height={h}
+                height={mouthStyle === 'speaker-dots' ? 6 + pose.mouthOpen * 6 : h}
                 rx={3}
                 fill={spec.secondaryColor}
               />

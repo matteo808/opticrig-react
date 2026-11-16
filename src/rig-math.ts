@@ -8,7 +8,9 @@ export const FALLBACK_OPTIC_SPEC: OpticAvatarSpec = {
   renderEngine: '3d',
   chassis: 'orbital-core',
   eyeStyle: 'aperture-iris',
+  mouthStyle: 'equalizer-bars',
   accessory: 'halo-ring',
+  sideAddon: 'none',
   materialFinish: 'obsidian-glass',
   bodyColor: '#0F172A',
   visorColor: '#050814',
@@ -18,6 +20,8 @@ export const FALLBACK_OPTIC_SPEC: OpticAvatarSpec = {
   visorScale: 1,
   eyeSpacing: 1,
   hoverAmplitude: 1,
+  glowIntensity: 1,
+  bodyStretchY: 1,
   defaultExpression: 'idle',
   roleBadge: 'AI CO-PILOT',
   customGlbUrl: null,
@@ -44,6 +48,8 @@ export function parseOpticSpecSafe(
   return {
     ...FALLBACK_OPTIC_SPEC,
     ...partial,
+    mouthStyle: partial.mouthStyle ?? FALLBACK_OPTIC_SPEC.mouthStyle,
+    sideAddon: partial.sideAddon ?? FALLBACK_OPTIC_SPEC.sideAddon,
     roundness: clamp(
       typeof partial.roundness === 'number' ? partial.roundness : FALLBACK_OPTIC_SPEC.roundness,
       0,
@@ -65,6 +71,20 @@ export function parseOpticSpecSafe(
         : FALLBACK_OPTIC_SPEC.hoverAmplitude,
       0,
       1.8,
+    ),
+    glowIntensity: clamp(
+      typeof partial.glowIntensity === 'number'
+        ? partial.glowIntensity
+        : (FALLBACK_OPTIC_SPEC.glowIntensity ?? 1),
+      0.3,
+      2,
+    ),
+    bodyStretchY: clamp(
+      typeof partial.bodyStretchY === 'number'
+        ? partial.bodyStretchY
+        : (FALLBACK_OPTIC_SPEC.bodyStretchY ?? 1),
+      0.8,
+      1.25,
     ),
   };
 }

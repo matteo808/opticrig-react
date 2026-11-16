@@ -194,7 +194,9 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
   const specSignature = JSON.stringify({
     chassis: spec.chassis,
     eyeStyle: spec.eyeStyle,
+    mouthStyle: spec.mouthStyle ?? 'equalizer-bars',
     accessory: spec.accessory,
+    sideAddon: spec.sideAddon ?? 'none',
     materialFinish: spec.materialFinish,
     bodyColor: spec.bodyColor,
     visorColor: spec.visorColor,
@@ -203,6 +205,8 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
     roundness: spec.roundness,
     visorScale: spec.visorScale,
     eyeSpacing: spec.eyeSpacing,
+    glowIntensity: spec.glowIntensity ?? 1,
+    bodyStretchY: spec.bodyStretchY ?? 1,
     customGlbUrl: spec.customGlbUrl ?? null,
   });
 
