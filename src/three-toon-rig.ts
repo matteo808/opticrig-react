@@ -1,7 +1,128 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { BuiltOpticRig } from './three-rig.ts';
-import type { OpticAvatarSpec } from './types.ts';
+import type { OpticAvatarSpec, OpticPrimitiveMotion } from './types.ts';
+
+export interface AnimatedPrimitiveHandle {
+  mesh: THREE.Mesh;
+  basePos: [number, number, number];
+  baseRot: [number, number, number];
+  baseScale: [number, number, number];
+  motion: OpticPrimitiveMotion;
+  sideSign: number;
+}
+
+export function attachCustomPrimitives3D(
+  spec: OpticAvatarSpec,
+  groups: { headGroup: THREE.Group; hoverPivot: THREE.Group },
+  trackGeo: <T extends THREE.BufferGeometry>(g: T) => T,
+  trackMat: <T extends THREE.Material>(m: T) => T,
+  toonGradient?: THREE.DataTexture,
+): AnimatedPrimitiveHandle[] {
+  const handles: AnimatedPrimitiveHandle[] = [];
+  const items = Array.isArray(spec.customPrimitives3D) ? spec.customPrimitives3D.slice(0, 14) : [];
+  const glowScale = Math.max(0.3, Math.min(2.0, spec.glowIntensity ?? 1));
+
+  for (const item of items) {
+    let geo: THREE.BufferGeometry;
+    switch (item.shape) {
+      case 'box':
+        geo = trackGeo(new THREE.BoxGeometry(1, 1, 1));
+        break;
+      case 'rounded-box':
+        geo = trackGeo(new RoundedBoxGeometry(1, 1, 1, 3, 0.16));
+        break;
+      case 'cylinder':
+        geo = trackGeo(new THREE.CylinderGeometry(0.45, 0.45, 1, 20));
+        break;
+      case 'cone':
+        geo = trackGeo(new THREE.ConeGeometry(0.5, 1, 18));
+        break;
+      case 'torus':
+        geo = trackGeo(new THREE.TorusGeometry(0.5, 0.15, 14, 36));
+        break;
+      case 'capsule':
+        geo = trackGeo(new THREE.CapsuleGeometry(0.35, 0.65, 8, 16));
+        break;
+      case 'octahedron':
+        geo = trackGeo(new THREE.OctahedronGeometry(0.55, 0));
+        break;
+      case 'sphere':
+      default:
+        geo = trackGeo(new THREE.SphereGeometry(0.55, 22, 18));
+        break;
+    }
+
+    const col = new THREE.Color(item.color || '#38BDF8');
+    let mat: THREE.Material;
+    if (item.material === 'emissive') {
+      mat = trackMat(
+        new THREE.MeshStandardMaterial({
+          color: col,
+          emissive: col,
+          emissiveIntensity: 1.35 * glowScale,
+          roughness: 0.2,
+          metalness: 0.1,
+        }),
+      );
+    } else if (item.material === 'glass') {
+      mat = trackMat(
+        new THREE.MeshStandardMaterial({
+          color: col,
+          roughness: 0.08,
+          metalness: 0.25,
+          transparent: true,
+          opacity: 0.72,
+        }),
+      );
+    } else if (item.material === 'alloy') {
+      mat = trackMat(
+        new THREE.MeshStandardMaterial({
+          color: col,
+          roughness: 0.28,
+          metalness: 0.82,
+        }),
+      );
+    } else {
+      mat = trackMat(
+        new THREE.MeshToonMaterial({
+          color: col,
+          gradientMap: toonGradient ?? null,
+        }),
+      );
+    }
+
+    const parent = item.attachTo === 'hover-orbit' ? groups.hoverPivot : groups.headGroup;
+    const sides = item.mirrorX ? [1, -1] : [1];
+
+    for (const s of sides) {
+      const px = item.position[0] * s;
+      const py = item.position[1];
+      const pz = item.position[2];
+      const rx = item.rotation[0];
+      const ry = item.rotation[1] * s;
+      const rz = item.rotation[2] * s;
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = `CustomPrim_${item.id}_${s === 1 ? 'R' : 'L'}`;
+      mesh.position.set(px, py, pz);
+      mesh.rotation.set(rx, ry, rz);
+      mesh.scale.set(item.scale[0], item.scale[1], item.scale[2]);
+      parent.add(mesh);
+
+      handles.push({
+        mesh,
+        basePos: [px, py, pz],
+        baseRot: [rx, ry, rz],
+        baseScale: [item.scale[0], item.scale[1], item.scale[2]],
+        motion: item.motion ?? 'float',
+        sideSign: s,
+      });
+    }
+  }
+
+  return handles;
+}
 
 function createToonGradientTexture(): THREE.DataTexture {
   const colors = new Uint8Array([
@@ -430,6 +551,14 @@ export function buildStylizedThreeRig(spec: OpticAvatarSpec): BuiltOpticRig {
     });
   }
 
+  const customPrimitives = attachCustomPrimitives3D(
+    spec,
+    { headGroup, hoverPivot },
+    trackGeo,
+    trackMat,
+    gradientMap,
+  );
+
   return {
     root,
     hoverPivot,
@@ -446,6 +575,7 @@ export function buildStylizedThreeRig(spec: OpticAvatarSpec): BuiltOpticRig {
     haloRing,
     floatingPointer,
     beaconMesh,
+    customPrimitives,
     accentMat,
     secondaryMat,
     geometries,

@@ -1698,6 +1698,94 @@ function renderTechHardware25D(ctx: CanvasRenderingContext2D, spec: OpticAvatarS
   ctx.restore();
 }
 
+function drawCustomPrimitives25D(
+  ctx: CanvasRenderingContext2D,
+  spec: OpticAvatarSpec,
+  pose: OpticPoseState,
+  layer: 'back' | 'front',
+): void {
+  const items = spec.customPrimitives3D;
+  if (!Array.isArray(items) || items.length === 0) return;
+
+  const hoverY = -pose.hoverY * 90;
+  const cx = 160 + pose.headYaw * 12;
+  const cy = 156 + pose.headPitch * 8 + hoverY;
+  const t = pose.accessorySpin;
+
+  for (let i = 0; i < Math.min(14, items.length); i++) {
+    const item = items[i]!;
+    const pz = item.position[2];
+    const inBack = pz < 0;
+    if ((layer === 'back' && !inBack) || (layer === 'front' && inBack)) {
+      continue;
+    }
+
+    const sides = item.mirrorX ? [1, -1] : [1];
+    for (const s of sides) {
+      let floatDy = 0;
+      let extraRot = 0;
+      let pulse = 1;
+      if (item.motion === 'float') floatDy = Math.sin(t * 2.6 + i) * 7;
+      else if (item.motion === 'spin-z' || item.motion === 'spin-y') extraRot = t * 1.4 * s;
+      else if (item.motion === 'wing-flap') extraRot = Math.sin(t * 4.4) * 0.26 * s;
+      else if (item.motion === 'talk-pulse') pulse = 1 + pose.mouthOpen * 0.22;
+      else if (item.motion === 'ear-twitch') extraRot = Math.sin(t * 5.2 + i) * 0.1 * s;
+
+      const x = cx + item.position[0] * 76 * s;
+      const y = cy - item.position[1] * 76 + floatDy;
+      const w = Math.max(8, item.scale[0] * 74 * pulse);
+      const h = Math.max(8, item.scale[1] * 74 * pulse);
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(-item.rotation[2] * s + extraRot);
+      ctx.fillStyle = item.material === 'glass' ? hexToRgba(item.color, 0.55) : item.color;
+      ctx.strokeStyle = adjustHex(item.color, -68);
+      ctx.lineWidth = item.material === 'emissive' ? 2 : 3;
+      if (item.material === 'emissive') {
+        ctx.shadowColor = item.color;
+        ctx.shadowBlur = 12 + pose.mouthOpen * 8;
+      }
+
+      if (item.shape === 'sphere' || item.shape === 'capsule') {
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w * 0.52, h * 0.52, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (item.shape === 'torus') {
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth = Math.max(4, Math.min(w, h) * 0.22);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w * 0.5, h * 0.28, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (item.shape === 'cone') {
+        ctx.beginPath();
+        ctx.moveTo(0, -h * 0.55);
+        ctx.lineTo(w * 0.5, h * 0.45);
+        ctx.lineTo(-w * 0.5, h * 0.45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else if (item.shape === 'octahedron') {
+        ctx.beginPath();
+        ctx.moveTo(0, -h * 0.58);
+        ctx.lineTo(w * 0.54, 0);
+        ctx.lineTo(0, h * 0.58);
+        ctx.lineTo(-w * 0.54, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        drawRoundedRectPath(ctx, -w * 0.5, -h * 0.5, w, h, item.shape === 'box' ? 3 : Math.min(w, h) * 0.26);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+  }
+}
+
 export function renderPuppet25DFrame(
   ctx: CanvasRenderingContext2D,
   spec: OpticAvatarSpec,
@@ -1707,6 +1795,8 @@ export function renderPuppet25DFrame(
   const scale = size / 320;
   ctx.save();
   ctx.scale(scale, scale);
+
+  drawCustomPrimitives25D(ctx, spec, pose, 'back');
 
   const universe: OpticUniverseId =
     spec.customSprites?.idleUrl
@@ -1734,6 +1824,8 @@ export function renderPuppet25DFrame(
       renderTechHardware25D(ctx, spec, pose);
       break;
   }
+
+  drawCustomPrimitives25D(ctx, spec, pose, 'front');
 
   ctx.restore();
 }

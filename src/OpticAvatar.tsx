@@ -226,6 +226,7 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
     customGlbUrl: spec.customGlbUrl ?? null,
     customVrmUrl: spec.customVrmUrl ?? null,
     customSprites: spec.customSprites ?? null,
+    customPrimitives3D: spec.customPrimitives3D ?? [],
   });
 
   useLayoutEffect(() => {

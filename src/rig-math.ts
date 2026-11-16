@@ -1,6 +1,9 @@
 import type {
   OpticAvatarSpec,
   OpticExpression,
+  OpticPrimitive3D,
+  OpticPrimitiveMotion,
+  OpticPrimitiveShape,
   OpticRenderEngine,
   OpticUniverseId,
   OpticWordTimestamp,
@@ -46,6 +49,80 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
 
+const VALID_SHAPES = new Set<OpticPrimitiveShape>([
+  'sphere',
+  'box',
+  'rounded-box',
+  'cylinder',
+  'cone',
+  'torus',
+  'capsule',
+  'octahedron',
+]);
+
+const VALID_MOTIONS = new Set<OpticPrimitiveMotion>([
+  'none',
+  'float',
+  'spin-y',
+  'spin-z',
+  'wing-flap',
+  'talk-pulse',
+  'ear-twitch',
+]);
+
+function sanitizeHexColor(raw: unknown, fallback = '#38BDF8'): string {
+  if (typeof raw !== 'string') return fallback;
+  const trimmed = raw.trim();
+  return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed : fallback;
+}
+
+function sanitizeVec3(raw: unknown, min: number, max: number, def: [number, number, number]): [number, number, number] {
+  if (!Array.isArray(raw) || raw.length < 3) return def;
+  return [
+    clamp(typeof raw[0] === 'number' && Number.isFinite(raw[0]) ? raw[0] : def[0], min, max),
+    clamp(typeof raw[1] === 'number' && Number.isFinite(raw[1]) ? raw[1] : def[1], min, max),
+    clamp(typeof raw[2] === 'number' && Number.isFinite(raw[2]) ? raw[2] : def[2], min, max),
+  ];
+}
+
+export function sanitizePrimitives3D(raw: unknown): OpticPrimitive3D[] {
+  if (!Array.isArray(raw)) return [];
+  const clean: OpticPrimitive3D[] = [];
+  for (let i = 0; i < Math.min(14, raw.length); i++) {
+    const item = raw[i] as Partial<OpticPrimitive3D> | null | undefined;
+    if (!item || typeof item !== 'object') continue;
+    const shape: OpticPrimitiveShape = VALID_SHAPES.has(item.shape as OpticPrimitiveShape)
+      ? (item.shape as OpticPrimitiveShape)
+      : 'sphere';
+    const motion: OpticPrimitiveMotion = VALID_MOTIONS.has(item.motion as OpticPrimitiveMotion)
+      ? (item.motion as OpticPrimitiveMotion)
+      : 'float';
+    const attachTo: OpticPrimitive3D['attachTo'] =
+      item.attachTo === 'head' || item.attachTo === 'body' || item.attachTo === 'hover-orbit'
+        ? item.attachTo
+        : 'head';
+    const material: OpticPrimitive3D['material'] =
+      item.material === 'toon' || item.material === 'alloy' || item.material === 'glass' || item.material === 'emissive'
+        ? item.material
+        : 'toon';
+
+    clean.push({
+      id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : `prim_${i + 1}`,
+      label: typeof item.label === 'string' ? item.label.slice(0, 32) : undefined,
+      shape,
+      attachTo,
+      position: sanitizeVec3(item.position, -2.2, 2.2, [0, 0, 0]),
+      rotation: sanitizeVec3(item.rotation, -6.3, 6.3, [0, 0, 0]),
+      scale: sanitizeVec3(item.scale, 0.03, 2.2, [0.3, 0.3, 0.3]),
+      color: sanitizeHexColor(item.color, '#38BDF8'),
+      material,
+      motion,
+      mirrorX: Boolean(item.mirrorX),
+    });
+  }
+  return clean;
+}
+
 export function parseOpticSpecSafe(
   raw: string | Partial<OpticAvatarSpec> | null | undefined,
 ): OpticAvatarSpec {
@@ -68,8 +145,8 @@ export function parseOpticSpecSafe(
     universe,
     characterBase: partial.characterBase ?? FALLBACK_OPTIC_SPEC.characterBase,
     hairStyle: partial.hairStyle ?? FALLBACK_OPTIC_SPEC.hairStyle,
-    hairColor: partial.hairColor ?? FALLBACK_OPTIC_SPEC.hairColor,
-    skinColor: partial.skinColor ?? FALLBACK_OPTIC_SPEC.skinColor,
+    hairColor: sanitizeHexColor(partial.hairColor, FALLBACK_OPTIC_SPEC.hairColor ?? '#1E293B'),
+    skinColor: sanitizeHexColor(partial.skinColor, FALLBACK_OPTIC_SPEC.skinColor ?? '#FFE4D6'),
     outfit: partial.outfit ?? FALLBACK_OPTIC_SPEC.outfit,
     blushIntensity: clamp(
       typeof partial.blushIntensity === 'number'
@@ -118,6 +195,8 @@ export function parseOpticSpecSafe(
     ),
     customVrmUrl: partial.customVrmUrl ?? null,
     customSprites: partial.customSprites ?? null,
+    customPrimitives3D: sanitizePrimitives3D(partial.customPrimitives3D),
+    identityBrief: partial.identityBrief ?? null,
   };
 }
 

@@ -1,5 +1,11 @@
 export type OpticRenderEngine = '3d' | '2.5d';
 
+export type OpticNicheWorkflowId =
+  | 'youtube-shorts'
+  | 'streamer-vtuber'
+  | 'photo-avatar'
+  | 'dev-3d-agent';
+
 export type OpticUniverseId =
   | 'anime'
   | 'animal'
@@ -127,6 +133,48 @@ export type OpticMaterialFinish =
 export type OpticExpression = 'idle' | 'talking' | 'skeptical' | 'insight' | 'warning' | 'approve';
 export type OpticCameraPreset = 'front' | 'three-quarter' | 'side';
 
+export type OpticPrimitiveShape =
+  | 'sphere'
+  | 'box'
+  | 'rounded-box'
+  | 'cylinder'
+  | 'cone'
+  | 'torus'
+  | 'capsule'
+  | 'octahedron';
+
+export type OpticPrimitiveMotion =
+  | 'none'
+  | 'float'
+  | 'spin-y'
+  | 'spin-z'
+  | 'wing-flap'
+  | 'talk-pulse'
+  | 'ear-twitch';
+
+export interface OpticPrimitive3D {
+  id: string;
+  label?: string;
+  shape: OpticPrimitiveShape;
+  attachTo: 'head' | 'body' | 'hover-orbit';
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+  color: string;
+  material: 'toon' | 'alloy' | 'glass' | 'emissive';
+  motion?: OpticPrimitiveMotion;
+  mirrorX?: boolean;
+}
+
+export interface OpticIdentityBrief {
+  personaName: string;
+  nicheLabel: string;
+  brandHook: string;
+  silhouetteRationale: string;
+  nanoBananaPrompt: string;
+  veoIntroPrompt: string;
+}
+
 export interface OpticCustomSprites {
   idleUrl: string;
   talkUrl?: string | null;
@@ -164,6 +212,8 @@ export interface OpticAvatarSpec {
   customGlbUrl?: string | null;
   customVrmUrl?: string | null;
   customSprites?: OpticCustomSprites | null;
+  customPrimitives3D?: OpticPrimitive3D[];
+  identityBrief?: OpticIdentityBrief | null;
 }
 
 export interface OpticWordTimestamp {

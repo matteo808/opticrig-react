@@ -2,7 +2,11 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { buildStylizedThreeRig } from './three-toon-rig.ts';
+import {
+  attachCustomPrimitives3D,
+  buildStylizedThreeRig,
+  type AnimatedPrimitiveHandle,
+} from './three-toon-rig.ts';
 import type { OpticPoseState } from './rig-math.ts';
 import type { OpticAvatarSpec, OpticMaterialFinish } from './types.ts';
 
@@ -22,6 +26,7 @@ export interface BuiltOpticRig {
   haloRing: THREE.Mesh | null;
   floatingPointer: THREE.Mesh | null;
   beaconMesh: THREE.Mesh | null;
+  customPrimitives: AnimatedPrimitiveHandle[];
   accentMat: THREE.MeshStandardMaterial;
   secondaryMat: THREE.MeshStandardMaterial;
   geometries: THREE.BufferGeometry[];
@@ -604,6 +609,13 @@ export function buildOpticThreeRig(spec: OpticAvatarSpec): BuiltOpticRig {
     });
   }
 
+  const customPrimitives = attachCustomPrimitives3D(
+    spec,
+    { headGroup, hoverPivot },
+    trackGeo,
+    trackMat,
+  );
+
   return {
     root,
     hoverPivot,
@@ -620,6 +632,7 @@ export function buildOpticThreeRig(spec: OpticAvatarSpec): BuiltOpticRig {
     haloRing,
     floatingPointer,
     beaconMesh,
+    customPrimitives,
     accentMat,
     secondaryMat,
     geometries,
@@ -734,6 +747,48 @@ export function applyPoseToOpticRig(
   }
   if (rig.floatingPointer) {
     rig.floatingPointer.position.y = -0.1 + Math.sin(pose.accessorySpin * 2.4) * 0.14;
+  }
+
+  for (let i = 0; i < rig.customPrimitives.length; i++) {
+    const h = rig.customPrimitives[i]!;
+    const t = pose.accessorySpin;
+    h.mesh.position.set(h.basePos[0], h.basePos[1], h.basePos[2]);
+    h.mesh.rotation.set(h.baseRot[0], h.baseRot[1], h.baseRot[2]);
+    h.mesh.scale.set(h.baseScale[0], h.baseScale[1], h.baseScale[2]);
+
+    switch (h.motion) {
+      case 'float':
+        h.mesh.position.y = h.basePos[1] + Math.sin(t * 2.6 + i) * 0.09;
+        break;
+      case 'spin-y':
+        h.mesh.rotation.y = h.baseRot[1] + t * 1.8 * h.sideSign;
+        break;
+      case 'spin-z':
+        h.mesh.rotation.z = h.baseRot[2] + t * 1.8 * h.sideSign;
+        break;
+      case 'wing-flap':
+        h.mesh.rotation.z =
+          h.baseRot[2] + Math.sin(t * 4.4 + pose.mouthOpen * 1.5) * 0.24 * h.sideSign;
+        h.mesh.rotation.y =
+          h.baseRot[1] + Math.cos(t * 4.4) * 0.14 * h.sideSign;
+        break;
+      case 'talk-pulse': {
+        const pulse = 1 + pose.mouthOpen * 0.22;
+        h.mesh.scale.set(
+          h.baseScale[0] * pulse,
+          h.baseScale[1] * pulse,
+          h.baseScale[2] * pulse,
+        );
+        break;
+      }
+      case 'ear-twitch':
+        h.mesh.rotation.z =
+          h.baseRot[2] + Math.sin(t * 5.2 + i) * (0.06 + pose.mouthOpen * 0.12) * h.sideSign;
+        break;
+      case 'none':
+      default:
+        break;
+    }
   }
 }
 
