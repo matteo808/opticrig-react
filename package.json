@@ -1,0 +1,27 @@
+{
+  "name": "@opticrig/react",
+  "version": "1.0.0",
+  "description": "Zero-uncanny 3D (.glb) & 2.5D Avatar-as-Code component for AI Voice Agents (Gemini Live, OpenAI Realtime, WebAudio) and Remotion 60fps videos.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "keywords": [
+    "avatar",
+    "threejs",
+    "remotion",
+    "voice-agent",
+    "lip-sync",
+    "mascot",
+    "react"
+  ],
+  "homepage": "https://opticrig.studio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matteo808/opticrig-react.git"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "three": ">=0.165.0"
+  }
+}
