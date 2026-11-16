@@ -1,11 +1,24 @@
 import type {
   OpticAvatarSpec,
   OpticExpression,
+  OpticRenderEngine,
+  OpticUniverseId,
   OpticWordTimestamp,
 } from './types.ts';
 
+export function inferDefaultRenderEngine(universe: OpticUniverseId): OpticRenderEngine {
+  return universe === 'animal' || universe === 'tech' ? '3d' : '2.5d';
+}
+
 export const FALLBACK_OPTIC_SPEC: OpticAvatarSpec = {
   renderEngine: '3d',
+  universe: 'tech',
+  characterBase: 'tech-core',
+  hairStyle: 'none',
+  hairColor: '#1E293B',
+  skinColor: '#FFE4D6',
+  outfit: 'none',
+  blushIntensity: 0.45,
   chassis: 'orbital-core',
   eyeStyle: 'aperture-iris',
   mouthStyle: 'equalizer-bars',
@@ -25,6 +38,8 @@ export const FALLBACK_OPTIC_SPEC: OpticAvatarSpec = {
   defaultExpression: 'idle',
   roleBadge: 'AI CO-PILOT',
   customGlbUrl: null,
+  customVrmUrl: null,
+  customSprites: null,
 };
 
 function clamp(v: number, min: number, max: number): number {
@@ -45,9 +60,24 @@ export function parseOpticSpecSafe(
     partial = raw;
   }
 
+  const universe: OpticUniverseId = partial.universe ?? FALLBACK_OPTIC_SPEC.universe ?? 'tech';
+
   return {
     ...FALLBACK_OPTIC_SPEC,
     ...partial,
+    universe,
+    characterBase: partial.characterBase ?? FALLBACK_OPTIC_SPEC.characterBase,
+    hairStyle: partial.hairStyle ?? FALLBACK_OPTIC_SPEC.hairStyle,
+    hairColor: partial.hairColor ?? FALLBACK_OPTIC_SPEC.hairColor,
+    skinColor: partial.skinColor ?? FALLBACK_OPTIC_SPEC.skinColor,
+    outfit: partial.outfit ?? FALLBACK_OPTIC_SPEC.outfit,
+    blushIntensity: clamp(
+      typeof partial.blushIntensity === 'number'
+        ? partial.blushIntensity
+        : (FALLBACK_OPTIC_SPEC.blushIntensity ?? 0.45),
+      0,
+      1,
+    ),
     mouthStyle: partial.mouthStyle ?? FALLBACK_OPTIC_SPEC.mouthStyle,
     sideAddon: partial.sideAddon ?? FALLBACK_OPTIC_SPEC.sideAddon,
     roundness: clamp(
@@ -86,6 +116,8 @@ export function parseOpticSpecSafe(
       0.8,
       1.25,
     ),
+    customVrmUrl: partial.customVrmUrl ?? null,
+    customSprites: partial.customSprites ?? null,
   };
 }
 

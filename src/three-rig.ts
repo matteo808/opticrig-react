@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { buildStylizedThreeRig } from './three-toon-rig.ts';
 import type { OpticPoseState } from './rig-math.ts';
 import type { OpticAvatarSpec, OpticMaterialFinish } from './types.ts';
 
@@ -46,6 +47,18 @@ function getFinishProperties(finish: OpticMaterialFinish): {
 }
 
 export function buildOpticThreeRig(spec: OpticAvatarSpec): BuiltOpticRig {
+  const universe = spec.universe ?? 'tech';
+  if (
+    universe === 'anime' ||
+    universe === 'animal' ||
+    universe === 'comic' ||
+    universe === 'pixel' ||
+    universe === 'custom-art' ||
+    spec.customSprites?.idleUrl
+  ) {
+    return buildStylizedThreeRig(spec);
+  }
+
   const geometries: THREE.BufferGeometry[] = [];
   const materials: THREE.Material[] = [];
 
@@ -638,14 +651,30 @@ export function applyPoseToOpticRig(
   const lookOffsetY = pose.eyeLookY * 0.06;
 
   if (rig.eyeLeft && rig.eyeRight) {
-    const gap = 0.3 * Math.max(0.75, Math.min(1.3, spec.eyeSpacing));
+    const isTech = (spec.universe ?? 'tech') === 'tech' && !spec.customSprites?.idleUrl;
     rig.eyeLeft.scale.y = pose.leftEyeScaleY;
     rig.eyeRight.scale.y = pose.rightEyeScaleY;
-    rig.eyeLeft.position.x = -gap + lookOffsetX;
-    rig.eyeRight.position.x = gap + lookOffsetX;
-    const baseY = spec.eyeStyle === 'happy-arcs' ? 0.13 : 0.18;
-    rig.eyeLeft.position.y = baseY + lookOffsetY;
-    rig.eyeRight.position.y = baseY + lookOffsetY;
+    if (isTech) {
+      const gap = 0.3 * Math.max(0.75, Math.min(1.3, spec.eyeSpacing));
+      rig.eyeLeft.position.x = -gap + lookOffsetX;
+      rig.eyeRight.position.x = gap + lookOffsetX;
+      const baseY = spec.eyeStyle === 'happy-arcs' ? 0.13 : 0.18;
+      rig.eyeLeft.position.y = baseY + lookOffsetY;
+      rig.eyeRight.position.y = baseY + lookOffsetY;
+    } else {
+      if (rig.eyeLeft.userData.baseX === undefined) {
+        rig.eyeLeft.userData.baseX = rig.eyeLeft.position.x;
+        rig.eyeLeft.userData.baseY = rig.eyeLeft.position.y;
+      }
+      if (rig.eyeRight.userData.baseX === undefined) {
+        rig.eyeRight.userData.baseX = rig.eyeRight.position.x;
+        rig.eyeRight.userData.baseY = rig.eyeRight.position.y;
+      }
+      rig.eyeLeft.position.x = (rig.eyeLeft.userData.baseX as number) + lookOffsetX * 0.45;
+      rig.eyeLeft.position.y = (rig.eyeLeft.userData.baseY as number) + lookOffsetY * 0.45;
+      rig.eyeRight.position.x = (rig.eyeRight.userData.baseX as number) + lookOffsetX * 0.45;
+      rig.eyeRight.position.y = (rig.eyeRight.userData.baseY as number) + lookOffsetY * 0.45;
+    }
   }
 
   if (rig.irisRing && rig.irisCore) {

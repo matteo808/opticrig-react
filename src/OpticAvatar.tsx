@@ -5,9 +5,9 @@ import { computeOpticPoseState } from './rig-math.ts';
 import {
   applyPoseToOpticRig,
   buildOpticThreeRig,
-  loadCustomGlbNormalized,
   type BuiltOpticRig,
 } from './three-rig.ts';
+import { loadCustomVrmOrGlb, type LoadedCustomAvatar3D } from './vrm-rig.ts';
 import type { OpticAvatarSpec, OpticCameraPreset, OpticExpression } from './types.ts';
 
 export interface OpticAvatarProps {
@@ -36,8 +36,8 @@ function getCameraAnglesForPreset(preset: OpticCameraPreset): { yaw: number; pit
 }
 
 const LiveOptic25D: React.FC<
-  Omit<OpticAvatarProps, 'interactive' | 'cameraPreset' | 'onCanvasMount'>
-> = ({ spec, expression, talkLevel = 0, deterministicTimeSec, entryProgress = 1, size = 240, className }) => {
+  Omit<OpticAvatarProps, 'interactive' | 'cameraPreset'>
+> = ({ spec, expression, talkLevel = 0, deterministicTimeSec, entryProgress = 1, size = 240, className, onCanvasMount }) => {
   const [liveSec, setLiveSec] = useState(0);
 
   useEffect(() => {
@@ -61,7 +61,15 @@ const LiveOptic25D: React.FC<
     hoverAmplitude: spec.hoverAmplitude,
   });
 
-  return <OpticVector25D spec={spec} pose={pose} size={size} className={className} />;
+  return (
+    <OpticVector25D
+      spec={spec}
+      pose={pose}
+      size={size}
+      className={className}
+      onCanvasMount={onCanvasMount}
+    />
+  );
 };
 
 const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
@@ -84,7 +92,7 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rimLightRef = useRef<THREE.DirectionalLight | null>(null);
   const rigRef = useRef<BuiltOpticRig | null>(null);
-  const customGroupRef = useRef<THREE.Group | null>(null);
+  const customAvatarRef = useRef<LoadedCustomAvatar3D | null>(null);
 
   const orbitRef = useRef<{ yaw: number; pitch: number }>({
     ...getCameraAnglesForPreset(cameraPreset),
@@ -171,9 +179,10 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
         rigRef.current.dispose();
         rigRef.current = null;
       }
-      if (customGroupRef.current) {
-        scene.remove(customGroupRef.current);
-        customGroupRef.current = null;
+      if (customAvatarRef.current) {
+        scene.remove(customAvatarRef.current.group);
+        customAvatarRef.current.dispose();
+        customAvatarRef.current = null;
       }
       renderer.dispose();
       rendererRef.current = null;
@@ -192,6 +201,13 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
   }, [size]);
 
   const specSignature = JSON.stringify({
+    universe: spec.universe ?? 'tech',
+    characterBase: spec.characterBase ?? 'tech-core',
+    hairStyle: spec.hairStyle ?? 'none',
+    hairColor: spec.hairColor ?? '#1E293B',
+    skinColor: spec.skinColor ?? '#FFE4D6',
+    outfit: spec.outfit ?? 'none',
+    blushIntensity: spec.blushIntensity ?? 0.45,
     chassis: spec.chassis,
     eyeStyle: spec.eyeStyle,
     mouthStyle: spec.mouthStyle ?? 'equalizer-bars',
@@ -208,6 +224,8 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
     glowIntensity: spec.glowIntensity ?? 1,
     bodyStretchY: spec.bodyStretchY ?? 1,
     customGlbUrl: spec.customGlbUrl ?? null,
+    customVrmUrl: spec.customVrmUrl ?? null,
+    customSprites: spec.customSprites ?? null,
   });
 
   useLayoutEffect(() => {
@@ -219,9 +237,10 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
       rigRef.current.dispose();
       rigRef.current = null;
     }
-    if (customGroupRef.current) {
-      scene.remove(customGroupRef.current);
-      customGroupRef.current = null;
+    if (customAvatarRef.current) {
+      scene.remove(customAvatarRef.current.group);
+      customAvatarRef.current.dispose();
+      customAvatarRef.current = null;
     }
 
     if (rimLightRef.current) {
@@ -233,17 +252,19 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
     rigRef.current = rig;
 
     let cancelled = false;
-    if (spec.customGlbUrl) {
-      loadCustomGlbNormalized(spec.customGlbUrl)
-        .then((group) => {
-          if (cancelled || !sceneRef.current) return;
+    const customModelUrl = spec.customVrmUrl || spec.customGlbUrl;
+    if (customModelUrl) {
+      loadCustomVrmOrGlb(customModelUrl, Boolean(spec.customVrmUrl))
+        .then((loaded) => {
+          if (cancelled || !sceneRef.current) {
+            loaded.dispose();
+            return;
+          }
           if (rigRef.current) {
             rigRef.current.root.visible = false;
           }
-          const wrap = new THREE.Group();
-          wrap.add(group);
-          sceneRef.current.add(wrap);
-          customGroupRef.current = wrap;
+          sceneRef.current.add(loaded.group);
+          customAvatarRef.current = loaded;
         })
         .catch(() => {
           if (rigRef.current) rigRef.current.root.visible = true;
@@ -263,9 +284,10 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
     const rig = rigRef.current;
     if (!renderer || !scene || !camera || !rig) return;
 
+    const exp = expression ?? spec.defaultExpression;
     const pose = computeOpticPoseState({
       timeSec: deterministicTimeSec,
-      expression: expression ?? spec.defaultExpression,
+      expression: exp,
       talkLevel,
       entryProgress,
       orbitYawRad: orbitRef.current.yaw,
@@ -274,10 +296,8 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
     });
 
     applyPoseToOpticRig(rig, pose, spec);
-    if (customGroupRef.current) {
-      customGroupRef.current.position.y = pose.hoverY;
-      customGroupRef.current.rotation.set(pose.headPitch, pose.headYaw, pose.headRoll);
-      customGroupRef.current.scale.setScalar(pose.entryScale);
+    if (customAvatarRef.current) {
+      customAvatarRef.current.applyPose(pose, exp);
     }
     renderer.render(scene, camera);
   }, [deterministicTimeSec, expression, talkLevel, entryProgress, specSignature, cameraPreset, webglFailed]);
@@ -306,10 +326,8 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
           hoverAmplitude: cur.spec.hoverAmplitude,
         });
         applyPoseToOpticRig(rig, pose, cur.spec);
-        if (customGroupRef.current) {
-          customGroupRef.current.position.y = pose.hoverY;
-          customGroupRef.current.rotation.set(pose.headPitch, pose.headYaw, pose.headRoll);
-          customGroupRef.current.scale.setScalar(pose.entryScale);
+        if (customAvatarRef.current) {
+          customAvatarRef.current.applyPose(pose, cur.expression);
         }
         renderer.render(scene, camera);
       }
@@ -394,12 +412,6 @@ const OpticThreeCanvas: React.FC<OpticAvatarProps> = ({
 export const OpticAvatar: React.FC<OpticAvatarProps> = (props) => {
   const { spec, onCanvasMount } = props;
 
-  useEffect(() => {
-    if (spec.renderEngine === '2.5d') {
-      onCanvasMount?.(null);
-    }
-  }, [spec.renderEngine, onCanvasMount]);
-
   if (spec.renderEngine === '2.5d') {
     return (
       <LiveOptic25D
@@ -410,6 +422,7 @@ export const OpticAvatar: React.FC<OpticAvatarProps> = (props) => {
         entryProgress={props.entryProgress}
         size={props.size}
         className={props.className}
+        onCanvasMount={onCanvasMount}
       />
     );
   }

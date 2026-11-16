@@ -1,4 +1,5 @@
-import React, { useId } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { preloadPuppetCustomImages, renderPuppet25DFrame } from './puppet-25d.ts';
 import { computeOpticPoseState, type OpticPoseState } from './rig-math.ts';
 import type { OpticAvatarSpec, OpticExpression } from './types.ts';
 
@@ -10,6 +11,7 @@ export interface OpticVector25DProps {
   talkLevel?: number;
   size?: number;
   className?: string;
+  onCanvasMount?: (canvas: HTMLCanvasElement | null) => void;
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -840,8 +842,14 @@ export const OpticVector25D: React.FC<OpticVector25DProps> = ({
   talkLevel = 0,
   size = 220,
   className,
+  onCanvasMount,
 }) => {
-  const reactId = useId().replace(/[^a-zA-Z0-9_-]/g, '_');
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [imgRevision, setImgRevision] = useState(0);
+
+  const dpr = typeof window !== 'undefined' ? Math.min(2, window.devicePixelRatio || 1) : 1;
+  const pixelSize = Math.max(64, Math.round(size * dpr));
+
   const resolvedPose =
     pose ??
     computeOpticPoseState({
@@ -851,20 +859,48 @@ export const OpticVector25D: React.FC<OpticVector25DProps> = ({
       hoverAmplitude: spec.hoverAmplitude,
     });
 
-  const { defs, content } = buildCoreSvgInner(spec, resolvedPose, `av_${reactId}`);
+  useEffect(() => {
+    preloadPuppetCustomImages(spec, () => {
+      setImgRevision((v) => v + 1);
+    });
+  }, [
+    spec.customSprites?.idleUrl,
+    spec.customSprites?.talkUrl,
+    spec.customSprites?.blinkUrl,
+    spec.customSprites?.talkBlinkUrl,
+  ]);
+
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    onCanvasMount?.(canvas);
+    return () => {
+      onCanvasMount?.(null);
+    };
+  }, [onCanvasMount]);
+
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (canvas.width !== pixelSize || canvas.height !== pixelSize) {
+      canvas.width = pixelSize;
+      canvas.height = pixelSize;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, pixelSize, pixelSize);
+    renderPuppet25DFrame(ctx, spec, resolvedPose, pixelSize);
+  }, [spec, resolvedPose, pixelSize, imgRevision]);
 
   return (
-    <svg
-      viewBox="0 0 320 320"
-      width={size}
-      height={size}
+    <canvas
+      ref={canvasRef}
+      width={pixelSize}
+      height={pixelSize}
       className={className}
-      style={{ display: 'block', overflow: 'visible' }}
+      style={{ width: size, height: size, display: 'block' }}
       role="img"
-      aria-label="OpticRig Mascot 2.5D"
-    >
-      {defs}
-      {content}
-    </svg>
+      aria-label="OpticRig Avatar 2.5D Puppet"
+    />
   );
 };
